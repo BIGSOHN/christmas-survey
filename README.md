@@ -1,16 +1,184 @@
-# React + Vite
+# 🎄 42 경산 크리스마스 이벤트 2024
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+42 경산 카뎃들을 위한 크리스마스 특별 이벤트 프로젝트입니다.
 
-Currently, two official plugins are available:
+## 📅 이벤트 일정
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **사전 설문**: 2024년 12월 10일 (화) ~ 12월 20일 (금)
+- **당일 이벤트**: 2024년 12월 24일 (화) 12:00 ~ 12:57
 
-## React Compiler
+## 🎯 이벤트 구성
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Part 1: 설문 결과 발표 (15분)
+**12:00 ~ 12:15**
 
-## Expanding the ESLint configuration
+42 경산 카뎃들의 통계를 재미있게 공개합니다:
+- 희망 개발 분야 분포
+- 주요 활동 시간대
+- MBTI 분포
+- 가장 힘들었던 과제 TOP 3
+- 밸런스 게임 사전 투표 결과
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Part 2: 실시간 밸런스 게임 배틀 (42분)
+**12:15 ~ 12:57**
+
+6개의 밸런스 게임 라운드를 진행하며, 참가자들이 모바일로 실시간 의견을 남기면 대형 화면에 표시됩니다.
+
+#### 밸런스 게임 문항
+1. **Round 1**: 팥붕어빵 vs 슈크림붕어빵
+2. **Round 2**: 1시간 찾기-10시간 해결 vs 10시간 찾기-1시간 해결
+3. **Round 3**: 세미콜론 실수 평생 vs 괄호 실수 평생
+4. **Round 4**: 완벽한 코드+소통X vs 부족한 코드+소통완벽
+5. **Round 5**: 고성능 데스크탑+출석 vs 저성능 노트북+재택
+6. **Round 6**: LGTM 리뷰어 vs 한 줄씩 지적하는 리뷰어
+
+## 📂 프로젝트 구조
+
+```
+christmas_survey/
+├── README.md              # 프로젝트 개요 (이 파일)
+├── src/                   # React 앱 소스코드
+│   ├── pages/             # 페이지 컴포넌트
+│   ├── components/        # 재사용 컴포넌트
+│   └── lib/               # Supabase 클라이언트 등
+├── public/                # 정적 파일
+├── archive/               # 구 코드 및 문서 보관소
+│   ├── VITE_README.md         # Vite 템플릿 원본 README
+│   └── old_survey_code/       # 구 설문조사 코드
+├── SurveyQuestions.md     # 설문 문항 25개
+├── BalanceGameEvent.md    # 실시간 이벤트 상세 기획
+└── .env.example           # 환경변수 템플릿
+```
+
+## 🛠️ 기술 스택
+
+### 사전 설문 (Part 1 데이터 수집)
+- **Google Forms**: 25개 설문 문항 수집
+- 수집된 데이터는 발표 자료로 시각화
+
+### 실시간 밸런스 게임 (Part 2)
+- **Frontend**: React + JavaScript (Vite)
+- **Backend/DB**: Supabase (실시간 기능)
+- **Styling**: Tailwind CSS
+- **Animation**: Framer Motion
+- **Deploy**: Vercel
+
+## 🚀 빠른 시작
+
+### 개발 환경 설정
+```bash
+# 의존성 설치
+npm install
+
+# 개발 서버 실행
+npm run dev
+
+# 빌드
+npm run build
+```
+
+상세한 설정 방법은 [SETUP.md](SETUP.md)를 참고하세요.
+
+### Supabase 설정
+1. [Supabase](https://supabase.com)에서 새 프로젝트 생성
+2. `supabase-schema.sql` 파일의 SQL 실행
+3. `.env` 파일에 API 키 설정
+   ```
+   VITE_SUPABASE_URL=your-project-url
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+## 📱 참여 방법
+
+### 사전 설문
+1. Google Forms 링크 접속 (12/10 ~ 12/20)
+2. 25개 문항 작성 (약 5분 소요)
+3. 제출 완료!
+
+### 당일 이벤트
+1. **Part 1 (12:00)**: 발표 화면 관람
+2. **Part 2 (12:15)**: QR 코드 스캔 → 모바일로 의견 입력 → 대형 화면에서 실시간 확인
+
+## 🎮 이벤트 시스템 구성
+
+### 3개의 화면
+1. **관리자 페이지** (`/admin`)
+   - 라운드 시작/종료 제어
+   - 타이머 관리
+   - 실시간 참가자 모니터링
+
+2. **대형 디스플레이** (`/display`)
+   - TV 화면에 전체화면으로 표시
+   - 현재 라운드 문제
+   - 양쪽 진영의 실시간 의견 대결
+   - QR 코드 상시 표시
+
+3. **참가자 모바일** (`/participate`)
+   - QR 코드로 접속
+   - 진영 선택 (A or B)
+   - 한 줄 의견 입력
+
+## 📊 데이터베이스
+
+### surveys (사전 설문)
+- 기본 정보: 인트라 ID, 서클, 희망 분야
+- 밸런스 게임: 선택지만 (A or B)
+
+### balance_game_rounds (라운드 정보)
+- 6개 라운드의 문제와 선택지
+
+### balance_game_comments (실시간 의견)
+- 라운드별 참가자 의견
+- 진영 (A or B)
+- 타임스탬프
+
+## 📝 개발 진행 상황
+
+- [x] 이벤트 기획 완료
+- [x] 설문 문항 작성 완료 (25개)
+- [x] 밸런스 게임 문항 확정 (6개)
+- [x] 데이터베이스 스키마 설계
+- [x] UI/UX 와이어프레임 작성
+- [x] React 프로젝트 초기 설정
+- [ ] Google Forms 설문 생성
+- [ ] React 페이지 개발 (Admin, Display, Participate)
+- [ ] Supabase 실시간 기능 연동
+- [ ] 배포 및 테스트
+
+## 📖 상세 문서
+
+- **설문 문항**: [SurveyQuestions.md](SurveyQuestions.md)
+  - 25개 질문 전체 목록
+  - 질문 의도 및 선택지
+
+- **실시간 이벤트 기획**: [BalanceGameEvent.md](BalanceGameEvent.md)
+  - 상세 타임라인
+  - 화면 레이아웃 3가지 옵션
+  - 데이터베이스 스키마
+  - 기술 구현 가이드
+
+- **구 코드 보관소**: [archive/](archive/)
+  - 구 설문조사 코드 및 설정 파일
+  - 참고용으로 보관
+
+## 🎯 목표
+
+1. **참여율**: 42 경산 카뎃 50명 이상 참여
+2. **재미**: 밸런스 게임을 통한 소통과 공감
+3. **소속감**: 42 경산 커뮤니티 활성화
+4. **추억**: 첫 크리스마스 이벤트 성공적 진행
+## 💡 특징
+
+- ✅ **간단한 참여**: QR 코드 스캔만으로 즉시 참여
+- ✅ **실시간 인터랙션**: 입력한 의견이 즉시 화면에 표시
+- ✅ **진영 대결**: 양쪽 의견이 대결하는 재미
+- ✅ **익명성**: 편하게 솔직한 의견 공유
+- ✅ **모바일 최적화**: 별도 앱 설치 불필요
+
+## 📞 문의
+
+이벤트 관련 문의사항은 슬랙으로 연락주세요!
+
+---
+
+**Made with ❤️ for 42 Gyeongsan Cadets**
