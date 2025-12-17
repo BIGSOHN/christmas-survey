@@ -8,19 +8,49 @@
 - ✅ `.gitignore`에 `.env` 추가
 - ✅ `.env.example` 템플릿 제공
 
-## ⚠️ 필수 조치 사항
+## ✅ anon key 노출에 대한 보안 평가
 
-### 1. Supabase 키 즉시 재발급 (가장 중요!)
+### Supabase anon key는 노출되어도 안전합니다
 
-노출된 키는 더 이상 사용하면 안 됩니다. 다음 단계를 따라 새 키를 발급받으세요:
+이 프로젝트는 **Row Level Security (RLS)가 올바르게 설정**되어 있어, `anon` key가 GitHub에 노출되었더라도 보안상 문제가 없습니다.
 
-1. [Supabase Dashboard](https://app.supabase.com) 로그인
-2. 프로젝트 선택
-3. **Settings** → **API** 이동
-4. **Reset** 버튼을 클릭하여 `anon` key 재발급
-5. 새 키를 로컬 `.env` 파일에 저장
+#### 왜 안전한가?
 
-### 2. Row Level Security (RLS) 정책 확인
+1. **anon key는 의도적으로 공개되는 키입니다**
+   - 브라우저(클라이언트)에서 사용하도록 설계됨
+   - Supabase 공식 문서에서도 "safe to use in a browser"라고 명시
+
+2. **RLS로 완전히 보호됩니다**
+   - 모든 테이블에 RLS 활성화됨
+   - anon 역할은 읽기와 제한된 쓰기만 가능
+   - 수정/삭제는 인증된 사용자만 가능
+
+3. **실제 적용된 보안 정책** (supabase-schema.sql 참조)
+
+   ```sql
+   ALTER TABLE balance_game_rounds ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE balance_game_comments ENABLE ROW LEVEL SECURITY;
+
+   -- 읽기: 모두 가능
+   CREATE POLICY "Anyone can read rounds" ON balance_game_rounds FOR SELECT USING (true);
+   CREATE POLICY "Anyone can read comments" ON balance_game_comments FOR SELECT USING (true);
+
+   -- 쓰기: 댓글 작성만 가능
+   CREATE POLICY "Anyone can insert comments" ON balance_game_comments FOR INSERT WITH CHECK (true);
+
+   -- 업데이트/삭제: 인증된 사용자만 가능 (관리자)
+   CREATE POLICY "Authenticated users can update rounds" ON balance_game_rounds FOR UPDATE USING (auth.role() = 'authenticated');
+   ```
+
+### ⚠️ 주의사항
+
+**service_role (secret) key는 절대 노출되면 안 됩니다!**
+
+- service_role key는 RLS를 우회할 수 있음
+- 서버 사이드에서만 사용해야 함
+- 이 프로젝트는 service_role key를 사용하지 않음
+
+### Row Level Security (RLS) 정책 확인
 
 데이터베이스 보안을 강화하려면:
 
@@ -69,11 +99,10 @@ CI/CD 파이프라인을 사용한다면 GitHub Secrets에 키를 저장하세�
 
 ## 📋 체크리스트
 
-- [ ] Supabase `anon` key 재발급 완료
-- [ ] 로컬 `.env` 파일에 새 키 저장
-- [ ] RLS 정책 확인 및 활성화
-- [ ] `git push --force` 로 GitHub에 정리된 히스토리 반영
-- [ ] 기존 노출된 키가 더 이상 작동하지 않는지 확인
+- [x] Git 히스토리에서 `.env` 파일 완전 제거 완료
+- [x] `.gitignore`에 `.env` 추가 완료
+- [x] RLS 정책 확인 완료 - 안전하게 설정되어 있음
+- [ ] `git push --force --all` 로 GitHub에 정리된 히스토리 반영
 - [ ] 팀원들에게 force push 알림 (협업 시)
 
 ## 🔐 향후 보안 best practices
