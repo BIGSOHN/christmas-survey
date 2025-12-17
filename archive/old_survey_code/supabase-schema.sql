@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS surveys (
     active_time TEXT,
     cluster_hours TEXT,
     study_location TEXT,
-    study_location_reason TEXT,
-    study_location_reason_other TEXT,
+    outside_cluster_activity JSONB, -- Array for multi-select
 
     -- Learning/Development Style
     work_style TEXT,
@@ -36,6 +35,14 @@ CREATE TABLE IF NOT EXISTS surveys (
     -- Fun Elements
     hardest_project TEXT,
     goal_2026 TEXT,
+
+    -- Balance Game Questions
+    balance_bungeoppang TEXT,
+    balance_bug TEXT,
+    balance_mistake TEXT,
+    balance_teamwork TEXT,
+    balance_environment TEXT,
+    balance_code_review TEXT,
 
     -- Constraints
     CONSTRAINT unique_intra_id UNIQUE(intra_id)

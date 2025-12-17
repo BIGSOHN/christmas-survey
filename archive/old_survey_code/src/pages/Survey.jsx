@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const QUESTIONS = [
+  // 기본 정보
   {
     id: 'intra_id',
     question: '42 Intra ID',
@@ -13,9 +14,11 @@ const QUESTIONS = [
     id: 'circle',
     question: '현재 서클',
     type: 'select',
-    options: ['0서클', '1서클', '2서클', '3서클', '4서클', '5서클', '6서클', '트랜센던스'],
+    options: ['0서클', '1서클', '2서클', '3서클', '4서클', '5서클', '6서클', 'Transcender'],
     required: true
   },
+
+  // 개발 관련 (커리어)
   {
     id: 'dev_field',
     question: '졸업 후 희망하는 개발 분야는?',
@@ -49,6 +52,8 @@ const QUESTIONS = [
     options: ['Vim/Neovim', 'VS Code', 'IntelliJ IDEA 계열', 'Emacs', 'Sublime Text', '기타'],
     required: true
   },
+
+  // 42 생활 패턴
   {
     id: 'active_time',
     question: '주로 클러스터에 오는 시간대는?',
@@ -65,7 +70,7 @@ const QUESTIONS = [
   },
   {
     id: 'cluster_hours',
-    question: '평균적으로 하루에 클러스터에서 몇 시간 정도 있나요?',
+    question: '평균적으로 하루 42경산에 몇 시간 정도 있나요?',
     type: 'select',
     options: ['2시간 미만', '2-4시간', '4-6시간', '6-8시간', '8-10시간', '10시간 이상', '거의 안 간다 (재택)'],
     required: true
@@ -78,30 +83,14 @@ const QUESTIONS = [
     required: true
   },
   {
-    id: 'study_location_reason',
-    question: '왜 이곳에서 주로 학습을 하나요?',
-    type: 'select',
-    options: [
-      '개인 노트북으로 공부하는게 편해서',
-      '클러스터 pc 내에서 내가 필요로 하는 소프트웨어를 지원하지 않아서',
-      '편하게 세팅할 수 있어서',
-      '기타'
-    ],
-    required: false,
-    showIf: (answers) => {
-      const location = answers.study_location
-      return location && location !== '클러스터 개방존' && location !== '사일런트존'
-    }
+    id: 'outside_cluster_activity',
+    question: '클러스터 외 다른 공간(오아시스, 오픈라운지)에서 주로 하는 활동은?',
+    type: 'multi-select',
+    options: ['개인 프로젝트', '다른 프로그래밍 언어 공부', '알고리즘 문제 풀이', 'CS 이론 공부', '휴식/카뎃들과 교류', '기타'],
+    required: false
   },
-  {
-    id: 'study_location_reason_other',
-    question: '기타 이유를 입력해주세요',
-    type: 'text',
-    required: false,
-    showIf: (answers) => {
-      return answers.study_location_reason === '기타'
-    }
-  },
+
+  // 학습/개발 스타일
   {
     id: 'work_style',
     question: '과제를 할 때 선호하는 방식은?',
@@ -123,6 +112,8 @@ const QUESTIONS = [
     options: ['공식 문서 정독', '유튜브/강의', '블로그/미디엄 글', '직접 코드 짜보면서', '다른 사람에게 물어보면서'],
     required: true
   },
+
+  // 성향
   {
     id: 'mbti',
     question: 'MBTI는?',
@@ -145,6 +136,8 @@ const QUESTIONS = [
     labels: ['전혀 안 믿는다', '별로 안 믿는다', '그냥 재미로만', '어느 정도 맞는 것 같다', '매우 신뢰한다'],
     required: true
   },
+
+  // 라이프스타일
   {
     id: 'coding_environment',
     question: '코딩할 때 선호하는 환경은?',
@@ -161,7 +154,7 @@ const QUESTIONS = [
   },
   {
     id: 'favorite_snack',
-    question: '42 경산에서 선호하는 간식은? (복수 선택)',
+    question: '42 경산에서 선호하는 간식은?',
     type: 'multi-select',
     options: ['커피/에너지 드링크', '소시지류', '에너지바류', '과자류', '젤리류', '기타'],
     required: true
@@ -174,12 +167,15 @@ const QUESTIONS = [
       'printf/console.log 도배',
       '디버거 툴 사용',
       '구글링',
+      '인공지능(ChatGPT, Claude 등)',
       '동료에게 물어봄',
       '러버덕 디버깅 (혼잣말)',
       '일단 코드 다시 짬'
     ],
     required: true
   },
+
+  // 재미 요소
   {
     id: 'hardest_project',
     question: '42 교육과정에서 가장 힘들었던 과제는?',
@@ -199,6 +195,65 @@ const QUESTIONS = [
       '기타'
     ],
     required: false
+  },
+
+  // 밸런스 게임
+  {
+    id: 'balance_bungeoppang',
+    question: '붕어빵 대결!',
+    type: 'select',
+    options: ['팥붕어빵', '슈크림붕어빵'],
+    required: true
+  },
+  {
+    id: 'balance_bug',
+    question: '버그를 찾았다! 당신의 선택은?',
+    type: 'select',
+    options: [
+      '1시간 안에 찾을 수 있지만 해결에 10시간 걸리는 버그',
+      '10시간 걸려 찾지만 1시간 안에 해결되는 버그'
+    ],
+    required: true
+  },
+  {
+    id: 'balance_mistake',
+    question: '평생 선택해야 한다면?',
+    type: 'select',
+    options: [
+      '세미콜론 빼먹는 실수를 평생 반복',
+      '괄호 짝 안 맞는 실수를 평생 반복'
+    ],
+    required: true
+  },
+  {
+    id: 'balance_teamwork',
+    question: '협업 스타일 선택!',
+    type: 'select',
+    options: [
+      '코드는 완벽한데 커뮤니케이션 0인 팀원',
+      '커뮤니케이션은 완벽한데 코드 실력이 부족한 팀원'
+    ],
+    required: true
+  },
+  {
+    id: 'balance_environment',
+    question: '개발 환경 선택! (지원금 고려 X)',
+    type: 'select',
+    options: [
+      '성능 좋은 데스크탑 + 클러스터 필수 출석',
+      '성능 부족한 노트북 + 완전 재택 가능'
+    ],
+    required: true
+  },
+  {
+    id: 'balance_code_review',
+    question: '코드 리뷰 받는다면?',
+    type: 'select',
+    options: [
+      '"LGTM(Looks Good To Me)" 만 달아주는 리뷰어',
+      '코드 한 줄 한 줄 지적하며 다시 짜라는 리뷰어'
+    ],
+    required: true
   }
 ]
 
@@ -238,6 +293,21 @@ export default function Survey() {
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
+      // Check for duplicate intra_id in Supabase
+      const intraId = answers.intra_id
+      const { data: existingData, error: checkError } = await supabase
+        .from('surveys')
+        .select('intra_id')
+        .eq('intra_id', intraId)
+        .single()
+
+      if (existingData && !checkError) {
+        alert(`${intraId}는 이미 설문에 참여하셨습니다. 중복 참여는 불가능합니다.`)
+        setIsSubmitting(false)
+        return
+      }
+
+      // Insert survey data to Supabase
       const { data, error } = await supabase
         .from('surveys')
         .insert([{
@@ -246,6 +316,11 @@ export default function Survey() {
         }])
 
       if (error) throw error
+
+      console.log('Survey data saved:', {
+        ...answers,
+        created_at: new Date().toISOString()
+      })
 
       alert('설문에 참여해주셔서 감사합니다!')
       navigate('/stats')
