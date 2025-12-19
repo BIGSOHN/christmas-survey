@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function AdminPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
   const [rounds, setRounds] = useState([])
   const [comments, setComments] = useState([])
   const [activeRound, setActiveRound] = useState(null)
@@ -14,23 +16,27 @@ export default function AdminPage() {
     option_b: ''
   })
 
+  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD // 나중에 42 OAuth로 교체 예정
+
   useEffect(() => {
-    fetchRounds()
-    fetchComments()
+    if (isAuthenticated) {
+      fetchRounds()
+      fetchComments()
 
-    // Realtime 구독
-    const commentsSubscription = supabase
-      .channel('admin_comments')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'balance_game_comments' },
-        () => fetchComments()
-      )
-      .subscribe()
+      // Realtime 구독
+      const commentsSubscription = supabase
+        .channel('admin_comments')
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'balance_game_comments' },
+          () => fetchComments()
+        )
+        .subscribe()
 
-    return () => {
-      commentsSubscription.unsubscribe()
+      return () => {
+        commentsSubscription.unsubscribe()
+      }
     }
-  }, [])
+  }, [isAuthenticated])
 
   const fetchRounds = async () => {
     const { data, error } = await supabase
@@ -56,29 +62,28 @@ export default function AdminPage() {
     if (data) setComments(data)
   }
 
-  const startRound = async (roundNumber) => {
-    // 모든 라운드 비활성화
-    await supabase
-      .from('balance_game_rounds')
-      .update({ is_active: false })
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+  const toggleRound = async (round) => {
+    if (round.is_active) {
+      // 진행 중인 라운드 종료
+      await supabase
+        .from('balance_game_rounds')
+        .update({ is_active: false })
+        .eq('id', round.id)
+    } else {
+      // 다른 라운드 시작
+      // 먼저 모든 라운드 비활성화
+      await supabase
+        .from('balance_game_rounds')
+        .update({ is_active: false })
+        .neq('id', '00000000-0000-0000-0000-000000000000')
 
-    // 해당 라운드만 활성화
-    await supabase
-      .from('balance_game_rounds')
-      .update({ is_active: true })
-      .eq('round_number', roundNumber)
+      // 해당 라운드만 활성화
+      await supabase
+        .from('balance_game_rounds')
+        .update({ is_active: true })
+        .eq('id', round.id)
+    }
 
-    fetchRounds()
-  }
-
-  const endRound = async () => {
-    await supabase
-      .from('balance_game_rounds')
-      .update({ is_active: false })
-      .eq('is_active', true)
-
-    setActiveRound(null)
     fetchRounds()
   }
 
@@ -87,6 +92,36 @@ export default function AdminPage() {
       .from('balance_game_comments')
       .update({ is_hidden: true })
       .eq('id', commentId)
+
+    fetchComments()
+  }
+
+  const unhideComment = async (commentId) => {
+    await supabase
+      .from('balance_game_comments')
+      .update({ is_hidden: false })
+      .eq('id', commentId)
+
+    fetchComments()
+  }
+
+  const deleteComment = async (commentId) => {
+    if (!confirm('정말 이 메시지를 삭제하시겠습니까?')) return
+
+    await supabase.from('balance_game_comments').delete().eq('id', commentId)
+
+    fetchComments()
+  }
+
+  const deleteAllComments = async () => {
+    if (
+      !confirm(
+        `정말 모든 메시지(${comments.length}개)를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`
+      )
+    )
+      return
+
+    await supabase.from('balance_game_comments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
     fetchComments()
   }
@@ -161,6 +196,47 @@ export default function AdminPage() {
     fetchRounds()
   }
 
+  const handleLogin = () => {
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAuthenticated(true)
+      setPasswordInput('')
+    } else {
+      alert('비밀번호가 틀렸습니다')
+      setPasswordInput('')
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
+          <h1 className="text-3xl font-bold text-center mb-6">🔒 관리자 로그인</h1>
+          <div className="space-y-4">
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleLogin()
+                }
+              }}
+              placeholder="비밀번호를 입력하세요"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+              autoFocus
+            />
+            <button
+              onClick={handleLogin}
+              className="w-full bg-purple-500 text-white font-bold py-3 rounded-lg hover:bg-purple-600 transition"
+            >
+              로그인
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -174,13 +250,15 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto">
         <header className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-800">🎮 관리자 페이지</h1>
-          {activeRound && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg min-h-[60px] flex items-center">
+            {activeRound ? (
               <p className="text-lg font-semibold text-blue-800">
                 현재 진행 중: Round {activeRound.round_number} - {activeRound.question_text}
               </p>
-            </div>
-          )}
+            ) : (
+              <p className="text-lg text-gray-400">진행 중인 라운드가 없습니다</p>
+            )}
+          </div>
         </header>
 
         {/* 라운드 관리 */}
@@ -231,33 +309,34 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => startRound(round.round_number)}
-                  disabled={round.is_active}
+                  onClick={() => toggleRound(round)}
                   className={`w-full mt-3 font-semibold py-2 px-4 rounded-lg transition ${
                     round.is_active
-                      ? 'bg-green-500 text-white cursor-not-allowed'
+                      ? 'bg-red-500 text-white hover:bg-red-600'
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
-                  {round.is_active ? '진행 중' : '시작하기'}
+                  {round.is_active ? '종료하기' : '시작하기'}
                 </button>
               </div>
             ))}
           </div>
-          {activeRound && (
-            <button
-              onClick={endRound}
-              className="mt-4 w-full bg-red-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-600"
-            >
-              현재 라운드 종료
-            </button>
-          )}
         </div>
 
         {/* 메시지 관리 */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold mb-4">메시지 관리</h2>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">메시지 관리</h2>
+            {comments.length > 0 && (
+              <button
+                onClick={deleteAllComments}
+                className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700"
+              >
+                전체 삭제
+              </button>
+            )}
+          </div>
+          <div className="space-y-1 max-h-96 overflow-y-auto">
             {comments.length === 0 ? (
               <p className="text-gray-500 text-center py-8">아직 메시지가 없습니다</p>
             ) : (
@@ -273,14 +352,29 @@ export default function AdminPage() {
                     <span className="text-gray-500 ml-2">({comment.side})</span>
                     <p className="mt-1">{comment.comment}</p>
                   </div>
-                  {!comment.is_hidden && (
+                  <div className="flex gap-2">
+                    {!comment.is_hidden ? (
+                      <button
+                        onClick={() => hideComment(comment.id)}
+                        className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                      >
+                        숨김
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => unhideComment(comment.id)}
+                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                      >
+                        표시
+                      </button>
+                    )}
                     <button
-                      onClick={() => hideComment(comment.id)}
+                      onClick={() => deleteComment(comment.id)}
                       className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
                     >
-                      숨김
+                      삭제
                     </button>
-                  )}
+                  </div>
                 </div>
               ))
             )}
