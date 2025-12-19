@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
+import profanityData from '../data/profanity.json'
 
 export default function ParticipantPage() {
   const [activeRound, setActiveRound] = useState(null)
@@ -10,31 +11,34 @@ export default function ParticipantPage() {
   const [submitted, setSubmitted] = useState(false)
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
-  const [profanityList, setProfanityList] = useState([])
+  // 욕설 리스트를 초기값으로 직접 설정
+  const profanityList = profanityData.profanityList || []
 
-  // 욕설 리스트 API에서 가져오기
-  useEffect(() => {
-    const fetchProfanityList = async () => {
-      try {
-        // TODO: 여기에 깃허브 API URL을 입력하세요
-        const API_URL = 'YOUR_GITHUB_API_URL_HERE'
-        const response = await fetch(API_URL)
-        const data = await response.json()
+  const fetchComments = useCallback(async (roundId) => {
+    const { data } = await supabase
+      .from('balance_game_comments')
+      .select('*')
+      .eq('round_id', roundId)
+      .eq('is_hidden', false)
+      .order('created_at', { ascending: true })
 
-        // API 응답 형식에 따라 수정이 필요할 수 있습니다
-        // 예: data.words, data.list, 또는 data 자체가 배열일 수 있습니다
-        setProfanityList(data)
-      } catch (error) {
-        console.error('욕설 리스트를 불러오는데 실패했습니다:', error)
-        // 실패 시 기본 리스트 사용 (선택사항)
-        setProfanityList([])
-      }
-    }
-
-    fetchProfanityList()
+    if (data) setComments(data)
   }, [])
 
   useEffect(() => {
+    const fetchActiveRound = async () => {
+      const { data } = await supabase
+        .from('balance_game_rounds')
+        .select('*')
+        .eq('is_active', true)
+        .single()
+
+      if (data) {
+        setActiveRound(data)
+        fetchComments(data.id)
+      }
+    }
+
     fetchActiveRound()
 
     // Realtime 구독
@@ -68,41 +72,90 @@ export default function ParticipantPage() {
       roundSubscription.unsubscribe()
       commentsSubscription.unsubscribe()
     }
-  }, [activeRound])
+  }, [activeRound, fetchComments])
 
-  const fetchActiveRound = async () => {
-    const { data } = await supabase
-      .from('balance_game_rounds')
-      .select('*')
-      .eq('is_active', true)
-      .single()
+  /**
+   * 욕설 필터링 체크 함수
+   *
+   * @param {string} text - 검사할 텍스트 (사용자가 입력한 메시지)
+   * @returns {boolean} - 욕설이 포함되어 있으면 true, 없으면 false
+   *
+   * 작동 방식:
+   * 1. profanityList에 있는 모든 욕설 단어를 하나씩 검사
+   * 2. 대소문자를 무시하고 비교 (영문 욕설 대응)
+   * 3. 부분 문자열 검색으로 욕설이 포함되어 있는지 확인
+   * 4. 하나라도 발견되면 즉시 true 반환
+   *
+   * 예시:
+   * - containsProfanity("안녕하세요") → false (욕설 없음)
+   * - containsProfanity("시발 좋네") → true ("시발"이 리스트에 있음)
+   * - containsProfanity("ㅅㅂ") → true ("ㅅㅂ"이 리스트에 있음)
+   * - containsProfanity("FUCK") → true (소문자 변환 후 "fuck"과 매칭)
+   */
+  const containsProfanity = (text) => {
+    // 욕설 리스트가 비어있으면 검사 생략 (통과)
+    if (profanityList.length === 0) return false
 
-    if (data) {
-      setActiveRound(data)
-      fetchComments(data.id)
+    // 대소문자 구분 없이 검사하기 위해 소문자로 변환
+    const lowerText = text.toLowerCase()
+
+    // profanityList의 각 욕설 단어에 대해 검사
+    // some(): 배열 요소 중 하나라도 조건을 만족하면 true 반환
+    return profanityList.some(word => {
+      const lowerWord = word.toLowerCase()
+      // includes(): 문자열에 특정 단어가 포함되어 있는지 확인
+      // 예: "이거 시발 좋네".includes("시발") → true
+      return lowerText.includes(lowerWord)
+    })
+  }
+
+  /**
+   * 세션 ID 생성 또는 가져오기
+   * - localStorage에 저장된 고유 ID 사용
+   * - 없으면 새로 생성 (브라우저별 고유 ID)
+   */
+  const getOrCreateSessionId = () => {
+    let sessionId = localStorage.getItem('balance_game_session_id')
+    if (!sessionId) {
+      sessionId = crypto.randomUUID()
+      localStorage.setItem('balance_game_session_id', sessionId)
+    }
+    return sessionId
+  }
+
+  /**
+   * 선택지 투표 저장
+   * - upsert: 이미 투표했으면 업데이트, 없으면 새로 삽입
+   * - 재투표 시 마지막 선택만 반영
+   */
+  const saveVote = async (side) => {
+    const sessionId = getOrCreateSessionId()
+
+    const { error } = await supabase
+      .from('balance_game_votes')
+      .upsert({
+        round_id: activeRound.id,
+        session_id: sessionId,
+        side: side
+      }, {
+        onConflict: 'round_id,session_id'
+      })
+
+    if (error) {
+      console.error('투표 저장 실패:', error)
+    } else {
+      console.log(`투표 저장 완료: ${side}`)
     }
   }
 
-  const fetchComments = async (roundId) => {
-    const { data } = await supabase
-      .from('balance_game_comments')
-      .select('*')
-      .eq('round_id', roundId)
-      .eq('is_hidden', false)
-      .order('created_at', { ascending: true })
-
-    if (data) setComments(data)
-  }
-
-  // 욕설 필터링 체크 함수
-  const containsProfanity = (text) => {
-    if (profanityList.length === 0) return false
-
-    const lowerText = text.toLowerCase()
-    return profanityList.some(word => {
-      const lowerWord = word.toLowerCase()
-      return lowerText.includes(lowerWord)
-    })
+  /**
+   * 선택지 선택 핸들러
+   * - 선택지를 state에 저장하고
+   * - DB에 투표 기록
+   */
+  const handleSideSelection = async (side) => {
+    setSelectedSide(side)
+    await saveVote(side)
   }
 
   const submitComment = async () => {
@@ -204,7 +257,7 @@ export default function ParticipantPage() {
 
             <div className="space-y-4">
               <button
-                onClick={() => setSelectedSide('A')}
+                onClick={() => handleSideSelection('A')}
                 className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-6 px-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 transition"
               >
                 <div className="text-2xl mb-2">😤</div>
@@ -212,7 +265,7 @@ export default function ParticipantPage() {
               </button>
 
               <button
-                onClick={() => setSelectedSide('B')}
+                onClick={() => handleSideSelection('B')}
                 className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-6 px-6 rounded-xl hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition"
               >
                 <div className="text-2xl mb-2">💪</div>

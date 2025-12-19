@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function AdminPage() {
@@ -18,27 +18,7 @@ export default function AdminPage() {
 
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD // 나중에 42 OAuth로 교체 예정
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchRounds()
-      fetchComments()
-
-      // Realtime 구독
-      const commentsSubscription = supabase
-        .channel('admin_comments')
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'balance_game_comments' },
-          () => fetchComments()
-        )
-        .subscribe()
-
-      return () => {
-        commentsSubscription.unsubscribe()
-      }
-    }
-  }, [isAuthenticated])
-
-  const fetchRounds = async () => {
+  const fetchRounds = useCallback(async () => {
     const { data, error } = await supabase
       .from('balance_game_rounds')
       .select('*')
@@ -50,9 +30,9 @@ export default function AdminPage() {
       setActiveRound(active)
     }
     setLoading(false)
-  }
+  }, [])
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     const { data } = await supabase
       .from('balance_game_comments')
       .select('*')
@@ -60,7 +40,67 @@ export default function AdminPage() {
       .limit(50)
 
     if (data) setComments(data)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    // 초기 데이터 로드 및 실시간 구독 설정
+    const initializeData = async () => {
+      await fetchRounds()
+      await fetchComments()
+    }
+
+    initializeData()
+
+    // Realtime 구독 - 댓글 변경사항 실시간 감지
+    const commentsSubscription = supabase
+      .channel('admin_comments_realtime')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'balance_game_comments' },
+        (payload) => {
+          console.log('새 댓글 추가됨:', payload.new)
+          fetchComments()
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'balance_game_comments' },
+        (payload) => {
+          console.log('댓글 업데이트됨:', payload.new)
+          fetchComments()
+        }
+      )
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'balance_game_comments' },
+        (payload) => {
+          console.log('댓글 삭제됨:', payload.old)
+          fetchComments()
+        }
+      )
+      .subscribe((status) => {
+        console.log('AdminPage 댓글 실시간 구독 상태:', status)
+      })
+
+    // 라운드 변경사항 실시간 감지
+    const roundsSubscription = supabase
+      .channel('admin_rounds_realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_rounds' },
+        (payload) => {
+          console.log('라운드 변경됨:', payload)
+          fetchRounds()
+        }
+      )
+      .subscribe((status) => {
+        console.log('AdminPage 라운드 실시간 구독 상태:', status)
+      })
+
+    return () => {
+      console.log('AdminPage 구독 해제')
+      commentsSubscription.unsubscribe()
+      roundsSubscription.unsubscribe()
+    }
+  }, [isAuthenticated, fetchRounds, fetchComments])
 
   const toggleRound = async (round) => {
     if (round.is_active) {

@@ -5,12 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 export default function DisplayPage() {
   const [activeRound, setActiveRound] = useState(null)
   const [comments, setComments] = useState([])
+  const [voteCounts, setVoteCounts] = useState({ A: 0, B: 0 })
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
 
   useEffect(() => {
     fetchActiveRound()
     fetchComments()
+    fetchVoteCounts()
 
     // Realtime 구독
     const roundSubscription = supabase
@@ -21,6 +23,7 @@ export default function DisplayPage() {
           if (payload.new.is_active) {
             setActiveRound(payload.new)
             fetchComments(payload.new.id)
+            fetchVoteCounts(payload.new.id)
           }
         }
       )
@@ -34,9 +37,19 @@ export default function DisplayPage() {
       )
       .subscribe()
 
+    // 투표 실시간 구독 추가
+    const votesSubscription = supabase
+      .channel('display_votes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_votes' },
+        () => activeRound && fetchVoteCounts(activeRound.id)
+      )
+      .subscribe()
+
     return () => {
       roundSubscription.unsubscribe()
       commentsSubscription.unsubscribe()
+      votesSubscription.unsubscribe()
     }
   }, [activeRound])
 
@@ -50,6 +63,7 @@ export default function DisplayPage() {
     if (data) {
       setActiveRound(data)
       fetchComments(data.id)
+      fetchVoteCounts(data.id)
     }
   }
 
@@ -64,6 +78,31 @@ export default function DisplayPage() {
       .order('created_at', { ascending: true })
 
     if (data) setComments(data)
+  }
+
+  /**
+   * 투표 집계 함수
+   * - balance_game_votes 테이블에서 실제 투표 수 집계
+   * - 각 진영별 투표 수를 카운트
+   */
+  const fetchVoteCounts = async (roundId = activeRound?.id) => {
+    if (!roundId) return
+
+    const { data, error } = await supabase
+      .from('balance_game_votes')
+      .select('side')
+      .eq('round_id', roundId)
+
+    if (error) {
+      console.error('투표 집계 실패:', error)
+      return
+    }
+
+    if (data) {
+      const countA = data.filter(v => v.side === 'A').length
+      const countB = data.filter(v => v.side === 'B').length
+      setVoteCounts({ A: countA, B: countB })
+    }
   }
 
   // 이전 메시지 개수 추적
@@ -111,13 +150,10 @@ export default function DisplayPage() {
     )
   }
 
-  const sideAComments = comments.filter(c => c.side === 'A')
-  const sideBComments = comments.filter(c => c.side === 'B')
-
-  // 각 진영별 고유 참가자 수 계산
-  const sideAParticipants = new Set(sideAComments.map(c => c.nickname)).size
-  const sideBParticipants = new Set(sideBComments.map(c => c.nickname)).size
-  const totalParticipants = sideAParticipants + sideBParticipants
+  // 투표 집계
+  const totalVotes = voteCounts.A + voteCounts.B
+  const percentageA = totalVotes > 0 ? Math.round((voteCounts.A / totalVotes) * 100) : 0
+  const percentageB = totalVotes > 0 ? Math.round((voteCounts.B / totalVotes) * 100) : 0
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -128,23 +164,43 @@ export default function DisplayPage() {
         </h1>
         <h2 className="text-3xl mb-4">{activeRound.question_text}</h2>
 
-        {/* 진영 vs 인원 표시 */}
+        {/* 진영 vs 투표 수 표시 */}
         <div className="flex justify-center items-center gap-8 text-2xl">
           <div className="text-blue-400 text-center">
             <div className="font-bold">{activeRound.option_a} 😤</div>
-            <div className="text-4xl font-bold mt-2">{sideAParticipants}명</div>
+            <div className="text-5xl font-bold mt-2">{voteCounts.A}표</div>
+            <div className="text-xl text-gray-400 mt-1">{percentageA}%</div>
           </div>
 
           <div className="text-gray-400 text-3xl">vs</div>
 
           <div className="text-pink-400 text-center">
             <div className="font-bold">{activeRound.option_b} 💪</div>
-            <div className="text-4xl font-bold mt-2">{sideBParticipants}명</div>
+            <div className="text-5xl font-bold mt-2">{voteCounts.B}표</div>
+            <div className="text-xl text-gray-400 mt-1">{percentageB}%</div>
           </div>
         </div>
 
         <div className="mt-4 text-lg text-gray-400">
-          총 참여자: {totalParticipants}명
+          총 투표: {totalVotes}표
+        </div>
+
+        {/* 진행률 바 */}
+        <div className="max-w-2xl mx-auto mt-6">
+          <div className="h-8 bg-gray-700 rounded-full overflow-hidden flex">
+            <div
+              className="bg-blue-500 flex items-center justify-center text-white font-bold transition-all duration-500"
+              style={{ width: `${percentageA}%` }}
+            >
+              {percentageA > 10 && `${percentageA}%`}
+            </div>
+            <div
+              className="bg-pink-500 flex items-center justify-center text-white font-bold transition-all duration-500"
+              style={{ width: `${percentageB}%` }}
+            >
+              {percentageB > 10 && `${percentageB}%`}
+            </div>
+          </div>
         </div>
       </div>
 
