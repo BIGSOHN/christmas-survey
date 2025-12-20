@@ -10,6 +10,7 @@ export default function ParticipantPage() {
   const [comments, setComments] = useState([])
   const [submitted, setSubmitted] = useState(false)
   const [showRoundEndMessage, setShowRoundEndMessage] = useState(false)
+  const [voteCounts, setVoteCounts] = useState({ A: 0, B: 0 })
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   // 욕설 리스트를 초기값으로 직접 설정
@@ -26,6 +27,21 @@ export default function ParticipantPage() {
     if (data) setComments(data)
   }, [])
 
+  const fetchVoteCounts = useCallback(async (roundId) => {
+    const { data: votes } = await supabase
+      .from('balance_game_votes')
+      .select('side')
+      .eq('round_id', roundId)
+
+    if (votes) {
+      const counts = { A: 0, B: 0 }
+      votes.forEach(vote => {
+        counts[vote.side]++
+      })
+      setVoteCounts(counts)
+    }
+  }, [])
+
   useEffect(() => {
     const fetchActiveRound = async () => {
       const { data } = await supabase
@@ -37,6 +53,7 @@ export default function ParticipantPage() {
       if (data) {
         setActiveRound(data)
         fetchComments(data.id)
+        fetchVoteCounts(data.id)
       }
     }
 
@@ -71,6 +88,7 @@ export default function ParticipantPage() {
             setComment('')
             setSubmitted(false)
             fetchComments(payload.new.id)
+            fetchVoteCounts(payload.new.id)
           }
         }
       )
@@ -84,11 +102,20 @@ export default function ParticipantPage() {
       )
       .subscribe()
 
+    const votesSubscription = supabase
+      .channel('participant_votes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_votes' },
+        () => activeRound && fetchVoteCounts(activeRound.id)
+      )
+      .subscribe()
+
     return () => {
       roundSubscription.unsubscribe()
       commentsSubscription.unsubscribe()
+      votesSubscription.unsubscribe()
     }
-  }, [activeRound, fetchComments])
+  }, [activeRound, fetchComments, fetchVoteCounts])
 
   /**
    * 욕설 필터링 체크 함수
@@ -311,29 +338,57 @@ export default function ParticipantPage() {
     )
   }
 
+  const totalVotes = voteCounts.A + voteCounts.B
+  const percentageA = totalVotes > 0 ? Math.round((voteCounts.A / totalVotes) * 100) : 50
+  const percentageB = totalVotes > 0 ? Math.round((voteCounts.B / totalVotes) * 100) : 50
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* 헤더 */}
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 flex-shrink-0">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          <button
-            onClick={() => {
-              setSelectedSide(null)
-              setComment('')
-            }}
-            className="text-white hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded-lg transition"
-          >
-            ← 돌아가기
-          </button>
-          <div className="text-center flex-1">
-            <h1 className="text-xl font-bold">
-              🎮 밸런스 게임
-            </h1>
-            <p className="text-sm">
-              {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
-            </p>
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white flex-shrink-0">
+        <div className="p-4">
+          <div className="flex items-center justify-between max-w-md mx-auto">
+            <button
+              onClick={() => {
+                setSelectedSide(null)
+                setComment('')
+              }}
+              className="text-white hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded-lg transition"
+            >
+              ← 돌아가기
+            </button>
+            <div className="text-center flex-1">
+              <h1 className="text-xl font-bold">
+                🎮 밸런스 게임
+              </h1>
+              <p className="text-sm">
+                {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
+              </p>
+            </div>
+            <div className="w-20"></div> {/* 균형 맞추기용 빈 공간 */}
           </div>
-          <div className="w-20"></div> {/* 균형 맞추기용 빈 공간 */}
+        </div>
+
+        {/* 투표 현황 바 */}
+        <div className="bg-white bg-opacity-10 px-4 py-3">
+          <div className="max-w-md mx-auto">
+            <div className="flex justify-between text-xs mb-1">
+              <span>😤 {activeRound.option_a}: {voteCounts.A}표 ({percentageA}%)</span>
+              <span>💪 {activeRound.option_b}: {voteCounts.B}표 ({percentageB}%)</span>
+            </div>
+            <div className="w-full bg-white bg-opacity-30 rounded-full h-2 overflow-hidden">
+              <div className="flex h-full">
+                <div
+                  className="bg-blue-400 transition-all duration-500"
+                  style={{ width: `${percentageA}%` }}
+                ></div>
+                <div
+                  className="bg-pink-400 transition-all duration-500"
+                  style={{ width: `${percentageB}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
