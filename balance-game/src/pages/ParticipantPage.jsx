@@ -9,6 +9,7 @@ export default function ParticipantPage() {
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState([])
   const [submitted, setSubmitted] = useState(false)
+  const [showRoundEndMessage, setShowRoundEndMessage] = useState(false)
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   // 욕설 리스트를 초기값으로 직접 설정
@@ -47,14 +48,29 @@ export default function ParticipantPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'balance_game_rounds' },
         (payload) => {
-          if (payload.new.is_active) {
+          // 현재 보고 있는 라운드가 종료된 경우
+          if (activeRound && payload.new.id === activeRound.id && !payload.new.is_active) {
+            // 종료 메시지 표시
+            setShowRoundEndMessage(true)
+            setActiveRound(null)
+            setSelectedSide(null)
+            setComment('')
+            setSubmitted(false)
+            setComments([])
+
+            // 2초 후 종료 메시지 숨김
+            setTimeout(() => {
+              setShowRoundEndMessage(false)
+            }, 2000)
+          }
+          // 새로운 라운드가 시작된 경우
+          else if (payload.new.is_active) {
+            setShowRoundEndMessage(false)
             setActiveRound(payload.new)
             setSelectedSide(null)
             setComment('')
             setSubmitted(false)
             fetchComments(payload.new.id)
-          } else {
-            setActiveRound(null)
           }
         }
       )
@@ -230,6 +246,23 @@ export default function ParticipantPage() {
     }
     prevCommentsLengthRef.current = comments.length
   }, [comments])
+
+  // 라운드 종료 메시지 표시
+  if (showRoundEndMessage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-white text-center"
+        >
+          <div className="text-6xl mb-4">🏁</div>
+          <h1 className="text-4xl font-bold mb-2">라운드가 종료되었습니다!</h1>
+          <p className="text-xl">잠시 후 다음 라운드가 시작됩니다...</p>
+        </motion.div>
+      </div>
+    )
+  }
 
   if (!activeRound) {
     return (
