@@ -347,17 +347,17 @@ export default function ParticipantPage() {
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white flex-shrink-0">
         <div className="p-4">
-          <div className="flex items-center gap-3 max-w-md mx-auto">
+          <div className="relative max-w-md mx-auto">
             <button
               onClick={() => {
                 setSelectedSide(null)
                 setComment('')
               }}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold px-4 py-2 rounded-lg transition shadow-md flex-shrink-0"
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold text-2xl w-10 h-10 rounded-lg transition shadow-md flex items-center justify-center"
             >
-              ← 돌아가기
+              ←
             </button>
-            <div className="text-center flex-1 min-w-0">
+            <div className="text-center px-14">
               <h1 className="text-base sm:text-lg font-bold truncate">
                 {activeRound.question_text}
               </h1>
