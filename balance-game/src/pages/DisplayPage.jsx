@@ -159,9 +159,7 @@ export default function DisplayPage() {
     <div className="min-h-screen bg-gray-900 text-white p-8">
       {/* 헤더 */}
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">
-          🎮 ROUND {activeRound.round_number}
-        </h1>
+        <h1 className="text-4xl font-bold mb-2">🎮 밸런스 게임</h1>
         <h2 className="text-3xl mb-4">{activeRound.question_text}</h2>
 
         {/* 진영 vs 투표 수 표시 */}

@@ -349,7 +349,7 @@ export default function AdminPage() {
           <div className="mt-4 p-4 bg-blue-50 rounded-lg min-h-[60px] flex items-center">
             {activeRound ? (
               <p className="text-lg font-semibold text-blue-800">
-                현재 진행 중: Round {activeRound.round_number} - {activeRound.question_text}
+                현재 진행 중: {activeRound.question_text}
               </p>
             ) : (
               <p className="text-lg text-gray-400">진행 중인 라운드가 없습니다</p>
@@ -388,8 +388,7 @@ export default function AdminPage() {
               >
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg">Round {round.round_number}</h3>
-                    <p className="text-gray-700 mt-1">{round.question_text}</p>
+                    <h3 className="font-bold text-lg">{round.question_text}</h3>
                     <div className="mt-2 space-y-1">
                       <p className="text-sm text-blue-600">
                         A: {round.option_a}

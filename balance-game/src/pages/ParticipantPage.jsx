@@ -249,7 +249,7 @@ export default function ParticipantPage() {
         <div className="max-w-md mx-auto pt-8">
           <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
             <h1 className="text-2xl font-bold text-center mb-2">
-              🎮 Round {activeRound.round_number}
+              🎮 밸런스 게임
             </h1>
             <h2 className="text-xl text-center text-gray-700 mb-6">
               {activeRound.question_text}
@@ -283,7 +283,7 @@ export default function ParticipantPage() {
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 text-center flex-shrink-0">
         <h1 className="text-xl font-bold">
-          🎮 R{activeRound.round_number}/6
+          🎮 밸런스 게임
         </h1>
         <p className="text-sm">
           {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
