@@ -46,7 +46,7 @@ export default function AdminPage() {
   const fetchVoteCounts = useCallback(async () => {
     const { data: votes } = await supabase
       .from('balance_game_votes')
-      .select('round_id, vote')
+      .select('round_id, side')
 
     if (votes) {
       const counts = {}
@@ -54,7 +54,7 @@ export default function AdminPage() {
         if (!counts[vote.round_id]) {
           counts[vote.round_id] = { A: 0, B: 0 }
         }
-        counts[vote.round_id][vote.vote]++
+        counts[vote.round_id][vote.side]++
       })
       setVoteCounts(counts)
     }
