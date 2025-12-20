@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingRound, setEditingRound] = useState(null)
+  const [voteCounts, setVoteCounts] = useState({})
   const [formData, setFormData] = useState({
     question_text: '',
     option_a: '',
@@ -42,6 +43,23 @@ export default function AdminPage() {
     if (data) setComments(data)
   }, [])
 
+  const fetchVoteCounts = useCallback(async () => {
+    const { data: votes } = await supabase
+      .from('balance_game_votes')
+      .select('round_id, vote')
+
+    if (votes) {
+      const counts = {}
+      votes.forEach(vote => {
+        if (!counts[vote.round_id]) {
+          counts[vote.round_id] = { A: 0, B: 0 }
+        }
+        counts[vote.round_id][vote.vote]++
+      })
+      setVoteCounts(counts)
+    }
+  }, [])
+
   useEffect(() => {
     if (!isAuthenticated) return
 
@@ -49,6 +67,7 @@ export default function AdminPage() {
     const initializeData = async () => {
       await fetchRounds()
       await fetchComments()
+      await fetchVoteCounts()
     }
 
     initializeData()
@@ -95,12 +114,27 @@ export default function AdminPage() {
         console.log('AdminPage 라운드 실시간 구독 상태:', status)
       })
 
+    // 투표 변경사항 실시간 감지
+    const votesSubscription = supabase
+      .channel('admin_votes_realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_votes' },
+        (payload) => {
+          console.log('투표 변경됨:', payload)
+          fetchVoteCounts()
+        }
+      )
+      .subscribe((status) => {
+        console.log('AdminPage 투표 실시간 구독 상태:', status)
+      })
+
     return () => {
       console.log('AdminPage 구독 해제')
       commentsSubscription.unsubscribe()
       roundsSubscription.unsubscribe()
+      votesSubscription.unsubscribe()
     }
-  }, [isAuthenticated, fetchRounds, fetchComments])
+  }, [isAuthenticated, fetchRounds, fetchComments, fetchVoteCounts])
 
   const toggleRound = async (round) => {
     if (round.is_active) {
@@ -236,6 +270,28 @@ export default function AdminPage() {
     fetchRounds()
   }
 
+  const resetVotesForRound = async (roundId) => {
+    if (!confirm('이 라운드의 모든 투표를 초기화하시겠습니까?')) return
+
+    await supabase
+      .from('balance_game_votes')
+      .delete()
+      .eq('round_id', roundId)
+
+    alert('투표가 초기화되었습니다')
+  }
+
+  const resetAllVotes = async () => {
+    if (!confirm('정말 모든 라운드의 투표를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return
+
+    await supabase
+      .from('balance_game_votes')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    alert('모든 투표가 초기화되었습니다')
+  }
+
   const handleLogin = () => {
     if (passwordInput === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
@@ -305,12 +361,20 @@ export default function AdminPage() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">라운드 관리</h2>
-            <button
-              onClick={openAddModal}
-              className="bg-blue-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-600"
-            >
-              + 새 라운드 추가
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={resetAllVotes}
+                className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600"
+              >
+                전체 투표 초기화
+              </button>
+              <button
+                onClick={openAddModal}
+                className="bg-blue-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-600"
+              >
+                + 새 라운드 추가
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {rounds.map((round) => (
@@ -327,8 +391,21 @@ export default function AdminPage() {
                     <h3 className="font-bold text-lg">Round {round.round_number}</h3>
                     <p className="text-gray-700 mt-1">{round.question_text}</p>
                     <div className="mt-2 space-y-1">
-                      <p className="text-sm text-blue-600">A: {round.option_a}</p>
-                      <p className="text-sm text-pink-600">B: {round.option_b}</p>
+                      <p className="text-sm text-blue-600">
+                        A: {round.option_a}
+                        <span className="font-bold ml-2">
+                          ({voteCounts[round.id]?.A || 0}표)
+                        </span>
+                      </p>
+                      <p className="text-sm text-pink-600">
+                        B: {round.option_b}
+                        <span className="font-bold ml-2">
+                          ({voteCounts[round.id]?.B || 0}표)
+                        </span>
+                      </p>
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-gray-600">
+                      총 {(voteCounts[round.id]?.A || 0) + (voteCounts[round.id]?.B || 0)}표
                     </div>
                   </div>
                   <div className="flex gap-2 ml-2">
@@ -348,16 +425,25 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => toggleRound(round)}
-                  className={`w-full mt-3 font-semibold py-2 px-4 rounded-lg transition ${
-                    round.is_active
-                      ? 'bg-red-500 text-white hover:bg-red-600'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {round.is_active ? '종료하기' : '시작하기'}
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => toggleRound(round)}
+                    className={`flex-1 font-semibold py-2 px-4 rounded-lg transition ${
+                      round.is_active
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {round.is_active ? '종료하기' : '시작하기'}
+                  </button>
+                  <button
+                    onClick={() => resetVotesForRound(round.id)}
+                    className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-orange-600 transition"
+                    title="투표 초기화"
+                  >
+                    🔄
+                  </button>
+                </div>
               </div>
             ))}
           </div>
