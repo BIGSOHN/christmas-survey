@@ -273,23 +273,33 @@ export default function AdminPage() {
   const resetVotesForRound = async (roundId) => {
     if (!confirm('이 라운드의 모든 투표를 초기화하시겠습니까?')) return
 
-    await supabase
+    const { error } = await supabase
       .from('balance_game_votes')
       .delete()
       .eq('round_id', roundId)
 
-    alert('투표가 초기화되었습니다')
+    if (error) {
+      alert('투표 초기화 실패: ' + error.message)
+    } else {
+      fetchVoteCounts()
+      alert('투표가 초기화되었습니다')
+    }
   }
 
   const resetAllVotes = async () => {
     if (!confirm('정말 모든 라운드의 투표를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return
 
-    await supabase
+    const { error } = await supabase
       .from('balance_game_votes')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000')
 
-    alert('모든 투표가 초기화되었습니다')
+    if (error) {
+      alert('투표 초기화 실패: ' + error.message)
+    } else {
+      fetchVoteCounts()
+      alert('모든 투표가 초기화되었습니다')
+    }
   }
 
   const handleLogin = () => {
