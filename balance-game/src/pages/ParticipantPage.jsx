@@ -347,25 +347,24 @@ export default function ParticipantPage() {
       {/* 헤더 */}
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white flex-shrink-0">
         <div className="p-4">
-          <div className="flex items-center justify-between max-w-md mx-auto">
+          <div className="flex items-center gap-3 max-w-md mx-auto">
             <button
               onClick={() => {
                 setSelectedSide(null)
                 setComment('')
               }}
-              className="text-white hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded-lg transition"
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold px-4 py-2 rounded-lg transition shadow-md flex-shrink-0"
             >
               ← 돌아가기
             </button>
-            <div className="text-center flex-1">
-              <h1 className="text-xl font-bold">
-                🎮 밸런스 게임
+            <div className="text-center flex-1 min-w-0">
+              <h1 className="text-base sm:text-lg font-bold truncate">
+                {activeRound.question_text}
               </h1>
-              <p className="text-sm">
+              <p className="text-xs sm:text-sm truncate">
                 {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
               </p>
             </div>
-            <div className="w-20"></div> {/* 균형 맞추기용 빈 공간 */}
           </div>
         </div>
 
