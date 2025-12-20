@@ -314,13 +314,27 @@ export default function ParticipantPage() {
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* 헤더 */}
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 text-center flex-shrink-0">
-        <h1 className="text-xl font-bold">
-          🎮 밸런스 게임
-        </h1>
-        <p className="text-sm">
-          {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
-        </p>
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 flex-shrink-0">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <button
+            onClick={() => {
+              setSelectedSide(null)
+              setComment('')
+            }}
+            className="text-white hover:bg-white hover:bg-opacity-20 px-3 py-2 rounded-lg transition"
+          >
+            ← 돌아가기
+          </button>
+          <div className="text-center flex-1">
+            <h1 className="text-xl font-bold">
+              🎮 밸런스 게임
+            </h1>
+            <p className="text-sm">
+              {selectedSide === 'A' ? `😤 ${activeRound.option_a}` : `💪 ${activeRound.option_b}`}
+            </p>
+          </div>
+          <div className="w-20"></div> {/* 균형 맞추기용 빈 공간 */}
+        </div>
       </div>
 
       {/* 채팅 영역 */}
@@ -348,9 +362,6 @@ export default function ParticipantPage() {
                 }`}
               >
                 <p>{c.comment}</p>
-                <p className="text-xs mt-1 opacity-70">
-                  {c.side === selectedSide ? '나' : '👤'}
-                </p>
               </div>
             </motion.div>
           ))}

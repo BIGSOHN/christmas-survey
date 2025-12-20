@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [supabaseAuth, setSupabaseAuth] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [rounds, setRounds] = useState([])
   const [comments, setComments] = useState([])
@@ -58,6 +61,22 @@ export default function AdminPage() {
       })
       setVoteCounts(counts)
     }
+  }, [])
+
+  // Supabase 세션 확인
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSupabaseAuth(!!session)
+      setLoading(false)
+    }
+    checkSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseAuth(!!session)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
@@ -271,6 +290,11 @@ export default function AdminPage() {
   }
 
   const resetVotesForRound = async (roundId) => {
+    if (!supabaseAuth) {
+      alert('투표 초기화 기능을 사용하려면 Supabase 인증이 필요합니다.')
+      return
+    }
+
     if (!confirm('이 라운드의 모든 투표를 초기화하시겠습니까?')) return
 
     const { error } = await supabase
@@ -280,6 +304,7 @@ export default function AdminPage() {
 
     if (error) {
       alert('투표 초기화 실패: ' + error.message)
+      console.error('Delete error:', error)
     } else {
       fetchVoteCounts()
       alert('투표가 초기화되었습니다')
@@ -287,6 +312,11 @@ export default function AdminPage() {
   }
 
   const resetAllVotes = async () => {
+    if (!supabaseAuth) {
+      alert('투표 초기화 기능을 사용하려면 Supabase 인증이 필요합니다.')
+      return
+    }
+
     if (!confirm('정말 모든 라운드의 투표를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return
 
     const { error } = await supabase
@@ -296,6 +326,7 @@ export default function AdminPage() {
 
     if (error) {
       alert('투표 초기화 실패: ' + error.message)
+      console.error('Delete error:', error)
     } else {
       fetchVoteCounts()
       alert('모든 투표가 초기화되었습니다')
@@ -310,6 +341,26 @@ export default function AdminPage() {
       alert('비밀번호가 틀렸습니다')
       setPasswordInput('')
     }
+  }
+
+  const handleSupabaseLogin = async () => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) {
+      alert('Supabase 로그인 실패: ' + error.message)
+    } else {
+      alert('Supabase 인증 완료! 이제 투표 초기화가 가능합니다.')
+      setEmail('')
+      setPassword('')
+    }
+  }
+
+  const handleSupabaseLogout = async () => {
+    await supabase.auth.signOut()
+    alert('Supabase 로그아웃 완료')
   }
 
   if (!isAuthenticated) {
@@ -355,15 +406,62 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-7xl mx-auto">
         <header className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">🎮 관리자 페이지</h1>
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg min-h-[60px] flex items-center">
-            {activeRound ? (
-              <p className="text-lg font-semibold text-blue-800">
-                현재 진행 중: {activeRound.question_text}
-              </p>
-            ) : (
-              <p className="text-lg text-gray-400">진행 중인 라운드가 없습니다</p>
-            )}
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-800">🎮 관리자 페이지</h1>
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg min-h-[60px] flex items-center">
+                {activeRound ? (
+                  <p className="text-lg font-semibold text-blue-800">
+                    현재 진행 중: {activeRound.question_text}
+                  </p>
+                ) : (
+                  <p className="text-lg text-gray-400">진행 중인 라운드가 없습니다</p>
+                )}
+              </div>
+            </div>
+
+            {/* Supabase 인증 상태 */}
+            <div className="ml-6 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
+              {supabaseAuth ? (
+                <div className="text-center">
+                  <div className="text-green-600 font-bold mb-2">✅ Supabase 인증됨</div>
+                  <div className="text-xs text-gray-500 mb-2">투표 초기화 가능</div>
+                  <button
+                    onClick={handleSupabaseLogout}
+                    className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
+                  >
+                    로그아웃
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-red-600 font-bold mb-3 text-sm">⚠️ Supabase 인증 필요</div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="이메일"
+                    className="w-full mb-2 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') handleSupabaseLogin()
+                    }}
+                    placeholder="비밀번호"
+                    className="w-full mb-2 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    onClick={handleSupabaseLogin}
+                    className="w-full bg-blue-500 text-white text-sm font-bold py-1.5 rounded hover:bg-blue-600"
+                  >
+                    인증하기
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
