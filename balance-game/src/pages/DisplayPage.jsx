@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -6,68 +6,14 @@ export default function DisplayPage() {
   const [activeRound, setActiveRound] = useState(null)
   const [comments, setComments] = useState([])
   const [voteCounts, setVoteCounts] = useState({ A: 0, B: 0 })
+  const [showRoundEndMessage, setShowRoundEndMessage] = useState(false)
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
 
-  useEffect(() => {
-    fetchActiveRound()
-    fetchComments()
-    fetchVoteCounts()
+  // activeRound ID를 ref로 관리 (closure 문제 해결)
+  const activeRoundIdRef = useRef(null)
 
-    // Realtime 구독
-    const roundSubscription = supabase
-      .channel('active_round')
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'balance_game_rounds' },
-        (payload) => {
-          if (payload.new.is_active) {
-            setActiveRound(payload.new)
-            fetchComments(payload.new.id)
-            fetchVoteCounts(payload.new.id)
-          }
-        }
-      )
-      .subscribe()
-
-    const commentsSubscription = supabase
-      .channel('display_comments')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'balance_game_comments' },
-        () => activeRound && fetchComments(activeRound.id)
-      )
-      .subscribe()
-
-    // 투표 실시간 구독 추가
-    const votesSubscription = supabase
-      .channel('display_votes')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'balance_game_votes' },
-        () => activeRound && fetchVoteCounts(activeRound.id)
-      )
-      .subscribe()
-
-    return () => {
-      roundSubscription.unsubscribe()
-      commentsSubscription.unsubscribe()
-      votesSubscription.unsubscribe()
-    }
-  }, [activeRound])
-
-  const fetchActiveRound = async () => {
-    const { data } = await supabase
-      .from('balance_game_rounds')
-      .select('*')
-      .eq('is_active', true)
-      .single()
-
-    if (data) {
-      setActiveRound(data)
-      fetchComments(data.id)
-      fetchVoteCounts(data.id)
-    }
-  }
-
-  const fetchComments = async (roundId = activeRound?.id) => {
+  const fetchComments = useCallback(async (roundId) => {
     if (!roundId) return
 
     const { data } = await supabase
@@ -78,14 +24,9 @@ export default function DisplayPage() {
       .order('created_at', { ascending: true })
 
     if (data) setComments(data)
-  }
+  }, [])
 
-  /**
-   * 투표 집계 함수
-   * - balance_game_votes 테이블에서 실제 투표 수 집계
-   * - 각 진영별 투표 수를 카운트
-   */
-  const fetchVoteCounts = async (roundId = activeRound?.id) => {
+  const fetchVoteCounts = useCallback(async (roundId) => {
     if (!roundId) return
 
     const { data, error } = await supabase
@@ -103,7 +44,94 @@ export default function DisplayPage() {
       const countB = data.filter(v => v.side === 'B').length
       setVoteCounts({ A: countA, B: countB })
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (activeRound) {
+      activeRoundIdRef.current = activeRound.id
+    } else {
+      activeRoundIdRef.current = null
+    }
+  }, [activeRound])
+
+  useEffect(() => {
+    const fetchActiveRound = async () => {
+      const { data } = await supabase
+        .from('balance_game_rounds')
+        .select('*')
+        .eq('is_active', true)
+        .single()
+
+      if (data) {
+        setActiveRound(data)
+        fetchComments(data.id)
+        fetchVoteCounts(data.id)
+      }
+    }
+
+    fetchActiveRound()
+
+    // Realtime 구독
+    const roundSubscription = supabase
+      .channel('active_round')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_rounds' },
+        (payload) => {
+          console.log('라운드 변경 감지:', payload)
+
+          // 라운드가 종료된 경우
+          if (!payload.new.is_active) {
+            setShowRoundEndMessage(true)
+            setActiveRound(null)
+            setComments([])
+            setVoteCounts({ A: 0, B: 0 })
+            // 3초 후 종료 메시지 숨김
+            setTimeout(() => {
+              setShowRoundEndMessage(false)
+            }, 3000)
+          }
+          // 새로운 라운드가 시작된 경우
+          else if (payload.new.is_active) {
+            setShowRoundEndMessage(false)
+            setActiveRound(payload.new)
+            fetchComments(payload.new.id)
+            fetchVoteCounts(payload.new.id)
+          }
+        }
+      )
+      .subscribe()
+
+    const commentsSubscription = supabase
+      .channel('display_comments')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_comments' },
+        () => {
+          if (activeRoundIdRef.current) {
+            fetchComments(activeRoundIdRef.current)
+          }
+        }
+      )
+      .subscribe()
+
+    // 투표 실시간 구독 추가
+    const votesSubscription = supabase
+      .channel('display_votes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'balance_game_votes' },
+        () => {
+          if (activeRoundIdRef.current) {
+            fetchVoteCounts(activeRoundIdRef.current)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      roundSubscription.unsubscribe()
+      commentsSubscription.unsubscribe()
+      votesSubscription.unsubscribe()
+    }
+  }, [fetchComments, fetchVoteCounts])
 
   // 이전 메시지 개수 추적
   const prevCommentsLengthRef = useRef(0)
@@ -137,6 +165,23 @@ export default function DisplayPage() {
     }
     prevCommentsLengthRef.current = comments.length
   }, [comments])
+
+  // 라운드 종료 메시지 표시
+  if (showRoundEndMessage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-white text-center"
+        >
+          <div className="text-8xl mb-6">🏁</div>
+          <h1 className="text-6xl font-bold mb-4">라운드가 종료되었습니다!</h1>
+          <p className="text-3xl">잠시 후 다음 라운드가 시작됩니다...</p>
+        </motion.div>
+      </div>
+    )
+  }
 
   if (!activeRound) {
     return (

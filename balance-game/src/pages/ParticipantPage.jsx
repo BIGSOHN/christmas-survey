@@ -15,6 +15,7 @@ export default function ParticipantPage() {
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const lastMessageTimeRef = useRef(0)
+  const cooldownIntervalRef = useRef(null)
   // 욕설 리스트를 초기값으로 직접 설정
   const profanityList = profanityData.profanityList || []
 
@@ -82,6 +83,12 @@ export default function ParticipantPage() {
 
           // 라운드가 종료된 경우
           if (!payload.new.is_active) {
+            // 쿨다운 타이머 정리
+            if (cooldownIntervalRef.current) {
+              clearInterval(cooldownIntervalRef.current)
+              cooldownIntervalRef.current = null
+            }
+
             // 종료 메시지 표시
             setShowRoundEndMessage(true)
             setActiveRound(null)
@@ -89,11 +96,12 @@ export default function ParticipantPage() {
             setComment('')
             setSubmitted(false)
             setComments([])
+            setCooldownRemaining(0)
 
-            // 2초 후 종료 메시지 숨김
+            // 3초 후 종료 메시지 숨김
             setTimeout(() => {
               setShowRoundEndMessage(false)
-            }, 2000)
+            }, 3000)
           }
           // 새로운 라운드가 시작된 경우
           else if (payload.new.is_active) {
@@ -244,6 +252,7 @@ export default function ParticipantPage() {
     // 욕설 필터링 체크
     if (containsProfanity(comment)) {
       alert('부적절한 언어가 포함되어 있습니다. 다시 작성해주세요.')
+      setComment('')
       return
     }
 
@@ -261,12 +270,18 @@ export default function ParticipantPage() {
     // 메시지를 보냈다는 플래그 설정
     justSentMessageRef.current = true
 
+    // 기존 interval 정리
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current)
+    }
+
     // 쿨다운 타이머 시작
     setCooldownRemaining(3)
-    const interval = setInterval(() => {
+    cooldownIntervalRef.current = setInterval(() => {
       setCooldownRemaining((prev) => {
         if (prev <= 1) {
-          clearInterval(interval)
+          clearInterval(cooldownIntervalRef.current)
+          cooldownIntervalRef.current = null
           return 0
         }
         return prev - 1
@@ -321,7 +336,7 @@ export default function ParticipantPage() {
       scrollToBottom()
     }
     prevCommentsLengthRef.current = comments.length
-  }, [comments])
+  }, [comments, selectedSide])
 
   // 라운드 종료 메시지 표시
   if (showRoundEndMessage) {
