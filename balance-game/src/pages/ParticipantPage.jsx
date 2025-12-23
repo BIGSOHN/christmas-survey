@@ -67,8 +67,10 @@ export default function ParticipantPage() {
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'balance_game_rounds' },
         (payload) => {
-          // 현재 보고 있는 라운드가 종료된 경우
-          if (activeRound && payload.new.id === activeRound.id && !payload.new.is_active) {
+          console.log('라운드 변경 감지:', payload)
+
+          // 라운드가 종료된 경우
+          if (!payload.new.is_active) {
             // 종료 메시지 표시
             setShowRoundEndMessage(true)
             setActiveRound(null)
