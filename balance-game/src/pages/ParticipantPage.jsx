@@ -44,6 +44,17 @@ export default function ParticipantPage() {
     }
   }, [])
 
+  // activeRound ID를 ref로 관리 (closure 문제 해결)
+  const activeRoundIdRef = useRef(null)
+
+  useEffect(() => {
+    if (activeRound) {
+      activeRoundIdRef.current = activeRound.id
+    } else {
+      activeRoundIdRef.current = null
+    }
+  }, [activeRound])
+
   useEffect(() => {
     const fetchActiveRound = async () => {
       const { data } = await supabase
@@ -65,7 +76,7 @@ export default function ParticipantPage() {
     const roundSubscription = supabase
       .channel('participant_round')
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'balance_game_rounds' },
+        { event: '*', schema: 'public', table: 'balance_game_rounds' },
         (payload) => {
           console.log('라운드 변경 감지:', payload)
 
@@ -102,7 +113,11 @@ export default function ParticipantPage() {
       .channel('participant_comments')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'balance_game_comments' },
-        () => activeRound && fetchComments(activeRound.id)
+        () => {
+          if (activeRoundIdRef.current) {
+            fetchComments(activeRoundIdRef.current)
+          }
+        }
       )
       .subscribe()
 
@@ -110,7 +125,11 @@ export default function ParticipantPage() {
       .channel('participant_votes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'balance_game_votes' },
-        () => activeRound && fetchVoteCounts(activeRound.id)
+        () => {
+          if (activeRoundIdRef.current) {
+            fetchVoteCounts(activeRoundIdRef.current)
+          }
+        }
       )
       .subscribe()
 
@@ -119,7 +138,7 @@ export default function ParticipantPage() {
       commentsSubscription.unsubscribe()
       votesSubscription.unsubscribe()
     }
-  }, [activeRound, fetchComments, fetchVoteCounts])
+  }, [fetchComments, fetchVoteCounts])
 
   /**
    * 욕설 필터링 체크 함수
