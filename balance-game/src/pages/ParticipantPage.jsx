@@ -11,8 +11,10 @@ export default function ParticipantPage() {
   const [submitted, setSubmitted] = useState(false)
   const [showRoundEndMessage, setShowRoundEndMessage] = useState(false)
   const [voteCounts, setVoteCounts] = useState({ A: 0, B: 0 })
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
+  const lastMessageTimeRef = useRef(0)
   // 욕설 리스트를 초기값으로 직접 설정
   const profanityList = profanityData.profanityList || []
 
@@ -207,6 +209,17 @@ export default function ParticipantPage() {
       return
     }
 
+    // 쿨다운 체크 (3초)
+    const now = Date.now()
+    const timeSinceLastMessage = now - lastMessageTimeRef.current
+    const cooldownTime = 3000 // 3초
+
+    if (timeSinceLastMessage < cooldownTime) {
+      const remainingSeconds = Math.ceil((cooldownTime - timeSinceLastMessage) / 1000)
+      alert(`너무 빠르게 메시지를 보내고 있습니다. ${remainingSeconds}초 후에 다시 시도해주세요.`)
+      return
+    }
+
     // 욕설 필터링 체크
     if (containsProfanity(comment)) {
       alert('부적절한 언어가 포함되어 있습니다. 다시 작성해주세요.')
@@ -220,9 +233,24 @@ export default function ParticipantPage() {
       comment: comment.trim(),
     })
 
+    // 마지막 메시지 전송 시간 기록
+    lastMessageTimeRef.current = now
+
     setComment('')
     // 메시지를 보냈다는 플래그 설정
     justSentMessageRef.current = true
+
+    // 쿨다운 타이머 시작
+    setCooldownRemaining(3)
+    const interval = setInterval(() => {
+      setCooldownRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   // 이전 메시지 개수 추적
@@ -434,7 +462,7 @@ export default function ParticipantPage() {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && comment.trim()) {
+                if (e.key === 'Enter' && comment.trim() && cooldownRemaining === 0) {
                   submitComment()
                 }
               }}
@@ -444,10 +472,10 @@ export default function ParticipantPage() {
             />
             <button
               onClick={submitComment}
-              disabled={!comment.trim()}
+              disabled={!comment.trim() || cooldownRemaining > 0}
               className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-6 py-3 rounded-lg disabled:opacity-50 hover:from-purple-600 hover:to-pink-600 transition-opacity"
             >
-              전송 📤
+              {cooldownRemaining > 0 ? `${cooldownRemaining}초` : '전송 📤'}
             </button>
           </div>
         </div>
